@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_job_user_id ON job_applications(user_id);

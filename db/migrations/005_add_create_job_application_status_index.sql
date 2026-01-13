@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_status_application_id ON application_status_history(application_id);
