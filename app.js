@@ -23,6 +23,10 @@ app.get('/', (req, res) => {
     return res.send('Job Application Tracker API is running!');
 });
 
+// Auth routes
+app.use("/auth", require("./routes/auth"));
+// Job application routes
+// app.use("/jobs", require("./routes/job-application"));
 
 // 404 handler for undefined routes
 app.use((req, res) => {
