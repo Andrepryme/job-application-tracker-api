@@ -7,7 +7,7 @@ const {
     createApp,
     getAllApps,
     getAppById,
-    updateApp,
+    updateAppStatus,
     deleteApp
 } = require("../db/repositories/applications");
 
@@ -25,42 +25,46 @@ router.use(authMiddleware);
 
 // Handles POST requests, and used to create data
 router.post("/", async(req, res) => {
-    // Extract title from the request body
-    const title = req.body.title;
-    // Validate the title
-    if (!title) {
-        return res.status(400).json({ error: "Title is required" });
+    // Extract user inputs from the request body
+    const comapanyName = req.body.company_name;
+    const roleTitle = req.body.role_title;
+    // Validate user inputs
+    if (!comapanyName) {
+        return res.status(400).json({ error: "Comapany name is required" });
     }
-    // Insert the new task into the database
+    if (!roleTitle) {
+        return res.status(400).json({ error: "Role title is required" });
+    }
+    // Insert the new application into the database
     try {
-        const newTask = await createApp(title, req.user.userId);
-        // Send the created task as JSON
-        res.status(201).json(newTask);
+        const newApplication = await createApp(comapanyName, roleTitle, req.user.userId);
+        // Send the created application as JSON
+        res.status(201).json(newApplication);
     } catch (err) {
         // Client & console log error message
         logError("CREATE ERROR:", err);
-        res.status(500).json({ error: "Failed to create task" });
+        res.status(500).json({ error: "Failed to create application" });
     }
 });
 
-// Handle GET requests for /tasks and sends data as JSON
+// Handle GET requests for /applications and sends data as JSON
 router.get("/", async(req, res) => {
     // Prepares the limit parameter from the request query
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     // Prepares the offset parameter from the request query
     const offset = parseInt(req.query.offset) || 0;
-    // Retrieve the task from the database
+    // Retrieve the applications from the database
     try {
-        const allTasks = await getAllTasks(req.user.userId, limit, offset);
-        if (!allTasks) {
-            return res.status(404).json({ error: "No tasks found" });
+        const allApplications = await getAllApps(req.user.userId, limit, offset);
+        if (!allApplications) {
+            return res.status(404).json({ error: "No applications found" });
         }
-        // Send the task as JSON
-        res.json(allTasks);
+        // Send the applications as JSON
+        res.json(allApplications);
     } catch (err) {
         // Client & console log error message
         logError("GET ALL ERROR:", err);
-        res.status(500).json({ error: "Failed to retrieve tasks" });
+        res.status(500).json({ error: "Failed to retrieve applications" });
     }
 });
 

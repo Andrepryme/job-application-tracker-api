@@ -26,7 +26,7 @@ app.get('/', (req, res) => {
 // Auth routes
 app.use("/auth", require("./routes/auth"));
 // Job application routes
-// app.use("/jobs", require("./routes/job-application"));
+app.use("/applications", require("./routes/applications"));
 
 // 404 handler for undefined routes
 app.use((req, res) => {

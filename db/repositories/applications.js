@@ -1,11 +1,12 @@
 const { pool } = require('../database');
 
+//defaultStatus = applied | interview | offer | rejected
+let defaultStatus = 'applied';
+
 // Function to create a new job application
 async function createApp(comapanyName, roleTitle, user_id) {
-    //currentStatuses = applied | interview | offer | rejected
-    const currentStatus = 'applied';
-    const sql = "INSERT INTO job_applications (company_name, role_title, current_status, user_id) VALUES ($1, $2, $3, $4) RETURNING id, title";
-    const result = await pool.query(sql, [comapanyName, roleTitle, currentStatus, user_id]);
+    const sql = "INSERT INTO job_applications (company_name, role_title, current_status, user_id) VALUES ($1, $2, $3, $4) RETURNING *";
+    const result = await pool.query(sql, [comapanyName, roleTitle, defaultStatus, user_id]);
     return result.rows[0];
 }
 
@@ -30,7 +31,7 @@ async function getAllApps(user_id, limit, offset) {
 }
 
 // Function to update a job application
-async function updateApp(applicationId, userId, newStatus) {
+async function updateAppStatus(applicationId, userId, newStatus) {
     const { thisPool } = require('../database');
     try {
         await thisPool.query('BEGIN');
@@ -78,7 +79,7 @@ async function updateApp(applicationId, userId, newStatus) {
 }
 
 // Function to delete a job application by ID
-async function deleteTask(id, user_id) {
+async function deleteApp(id, user_id) {
     const sql = "DELETE FROM job_applications WHERE id = $1 AND user_id = $2";
     const result = await pool.query(sql, [id, user_id]);
     return result.rowCount; 
@@ -88,6 +89,6 @@ module.exports = {
     createApp,
     getAllApps,
     getAppById,
-    updateApp,
+    updateAppStatus,
     deleteApp
 }
