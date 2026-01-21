@@ -55,7 +55,7 @@ router.post("/register", async (req, res) => {
     // Handle unique constraint violation for email
     if (err.code === '23505') {
       // Client & console log error message
-      logInfo("Email already exists")
+      logInfo("Email already exist")
       return res.status(409).json({ error: "Email already exists" });
     }
     // Client & console log error message

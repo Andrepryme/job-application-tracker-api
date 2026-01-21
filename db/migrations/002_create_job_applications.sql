@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS job_applications (
   company_name TEXT NOT NULL,
   role_title TEXT NOT NULL,
   current_status TEXT NOT NULL,
-  applied_at DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
