@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-// Import database functions for Tasks
+// Import database functions for job application
 const {
     createApp,
     getAllApps,
@@ -23,7 +23,7 @@ const {
 // Apply authentication middleware to all routes in this router
 router.use(authMiddleware);
 
-// Handles POST requests, and used to create data
+// Handles POST requests, and used to create application
 router.post("/", async(req, res) => {
     // Extract user inputs from the request body
     const comapanyName = req.body.company_name;
@@ -68,28 +68,28 @@ router.get("/", async(req, res) => {
     }
 });
 
-// Handle GET requests for /tasks/:id and sends data as JSON
+// Handle GET requests for /applications/:id and sends data as JSON
 router.get("/:id", async(req, res) => {
-    // Extract the task ID from the URL parameters
-    const taskId = Number(req.params.id);
-    // Validate the task ID
-    if (Number.isNaN(taskId)) {
-        return res.status(400).json({ error: "Invalid task ID" });
+    // Extract the applications ID from the URL parameters
+    const applicationId = Number(req.params.id);
+    // Validate the application ID
+    if (Number.isNaN(applicationId)) {
+        return res.status(400).json({ error: "Invalid application ID" });
     }
-    // Retrieve the task from the database
+    // Retrieve the application from the database
     try {
-        const thisTask = await getTaskById(taskId, req.user.userId);
-        // If task not found, send 404 response
-        if (!thisTask) {
-            return res.status(404).json({ error: "Task not found" });
+        const thisApplication = await getAppById(applicationId, req.user.userId);
+        // If application not found, send 404 response
+        if (!thisApplication) {
+            return res.status(404).json({ error: "Application not found" });
         }
-        // Send the task as JSON
-        res.status(200).json(thisTask);
+        // Send the application as JSON
+        res.status(200).json(thisApplication);
     } catch (err) {
         // Console error for debugging
         logError("GET BY ID ERROR:", err);
         // Return a 500 error response
-        res.status(500).json({ error: "Failed to retrieve task" });  
+        res.status(500).json({ error: "Failed to retrieve application" });  
     }
 });
 
@@ -154,20 +154,20 @@ router.patch("/:id", async(req, res) => {
     }
 });
 
-// Handle DELETE requests for /tasks/:id to delete a task
+// Handle DELETE requests for /applications/:id to delete a application
 router.delete("/:id", async (req, res) => {
-    // Extract the task ID from the URL parameters
-    const taskId = Number(req.params.id);
-    // Validate the task ID
-    if (Number.isNaN(taskId)) {
-        return res.status(400).json({ error: "Invalid task ID" });
+    // Extract the application ID from the URL parameters
+    const applicationId = Number(req.params.id);
+    // Validate the application ID
+    if (Number.isNaN(applicationId)) {
+        return res.status(400).json({ error: "Invalid application ID" });
     }
-    // Delete the task from the database
+    // Delete the application from the database
     try {
-        const deletedTask = await deleteTask(taskId, req.user.userId);
-        // If no rows were affected, the task was not found
-        if (deletedTask === 0) {
-            return res.status(404).json({ error: "Task not found" });
+        const deletedApp = await deleteApp(applicationId, req.user.userId);
+        // If no rows were affected, the application was not found
+        if (deletedApp === 0) {
+            return res.status(404).json({ error: "Application not found" });
         }
         // Send a 204 No Content response        
         res.status(204).send();
@@ -175,7 +175,7 @@ router.delete("/:id", async (req, res) => {
         // Console error for debugging
         console.error("DELETE ERROR:", err);
         // Return a 500 error response
-        res.status(500).json({ error: "Failed to delete task" });
+        res.status(500).json({ error: "Failed to delete application" });
     }
 });
 

@@ -16,7 +16,6 @@ const statusTransitions = {
     accepted: [],
     rejected: []
 };
-  
 
 // Function to create a new job application
 async function createApp(comapanyName, roleTitle, user_id) {
@@ -117,7 +116,7 @@ async function updateAppStatus(applicationId, userId, newStatus) {
             [applicationId, oldStatus, approvedNewStatus]
         );
         await client.query('COMMIT');
-        return { oldStatus, approvedNewStatus };
+        return { applicationId, oldStatus, approvedNewStatus };
 
     } catch (err) {
         await client.query('ROLLBACK');
