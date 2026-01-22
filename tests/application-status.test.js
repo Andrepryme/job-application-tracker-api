@@ -1,0 +1,89 @@
+const request = require("supertest");
+const app = require("../app");
+
+let token;
+let applicationId;
+
+describe('Job Application', () => {
+    beforeAll(async () => {
+
+        // Define test user credentials
+        const email = `test_${Date.now()}@example.com`;
+        const password = "TestPassword123";
+
+        // Register a new user
+        await request(app)
+            .post("/auth/register")
+            .send({ email, password });
+
+        // Log in with the newly registered user
+        const loginRes = await request(app)
+            .post("/auth/login")
+            .send({ email, password });
+            token = loginRes.body.token;
+
+        // Create a new job application
+        const appRes = await request(app)
+            .post("/applications")
+            .set("Authorization", `Bearer ${token}`)
+            .send({
+                company_name: 'Marine Technologies',
+                role_title: 'DevOp Engineer'
+            });
+            applicationId = appRes.body.id;
+
+    });
+
+    it('allows valid status transition: applied -> interview', async () => {
+        const res = await request(app)
+            .patch(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'interview' });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.updatedApp.approvedNewStatus).toBe('interview');
+    });
+
+    it('rejects invalid transistions: interview -> applied', async () => {
+        const res = await request(app)
+            .patch(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'applied' });
+
+        expect(res.statusCode).toBe(409);
+    });
+    
+    it('rejects same-status update: interview -> interview', async () => {
+        const res = await request(app)
+            .patch(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'interview' });
+        expect(res.statusCode).toBe(409);
+    });
+
+    it('moves interview -> offer -> accepted', async () => {
+        await request(app)
+            .patch(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'offer' });
+
+        const res = await request(app)
+            .patch(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'accepted' });
+        expect(res.statusCode).toBe(200);
+    });
+
+    it('blocks transistion from terminal state', async () => {
+        await request(app)
+            .patch(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'offer' });
+
+        const res = await request(app)
+            .patch(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'rejected' });
+        expect(res.statusCode).toBe(409);
+    });
+});
