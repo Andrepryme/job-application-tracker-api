@@ -59,7 +59,7 @@ async function updateAppStatus(applicationId, userId, newStatus) {
     if (!approvedNewStatus) {
         throw new Error('InvalidStatus');
     }
-
+    // Begin update transaction
     try {
         await client.query('BEGIN');
 
