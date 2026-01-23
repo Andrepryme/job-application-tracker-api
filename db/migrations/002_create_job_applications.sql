@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS job_applications (
   user_id INTEGER NOT NULL,
   company_name TEXT NOT NULL,
   role_title TEXT NOT NULL,
-  current_status TEXT NOT NULL,
+  current_status TEXT NOT NULL DEFAULT 'applied',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

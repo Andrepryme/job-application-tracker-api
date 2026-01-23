@@ -48,7 +48,7 @@ router.post("/register", async (req, res) => {
     res.status(201).json({
       message: "User registered successfully",
       user: {
-        id: newUser.id, email: newUser.email
+        id: newUser.id, email: newUser.email, role: newUser.user_role
       }
     });
   } catch (err) {
@@ -97,14 +97,14 @@ router.post('/login', async (req, res) => {
     }
     // Generate JWT token
     const token = jwt.sign(
-      { userId: thisUser.id, email: thisUser.email },
+      { userId: thisUser.id, email: thisUser.email, role: thisUser.user_role },
       JWT_SECRET,
       { expiresIn: "1h" }
     );
     // Successful login response
     res.json({ 
       message: "Login successful",
-      user: { id: thisUser.id, email: thisUser.email },
+      user: { id: thisUser.id, email: thisUser.email, role: thisUser.user_role },
       token
     });
   } catch (err) {

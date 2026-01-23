@@ -20,11 +20,13 @@ const {
     logInfo
 } = require("../utils/logger");
 
+const { requireRole } = require("../middleware/rbac");
+
 // Apply authentication middleware to all routes in this router
 router.use(authMiddleware);
 
 // Handles POST requests, and used to create application
-router.post("/", async(req, res) => {
+router.post("/", requireRole('user', 'admin'), async(req, res) => {
     // Extract user inputs from the request body
     const comapanyName = req.body.company_name;
     const roleTitle = req.body.role_title;
@@ -48,7 +50,7 @@ router.post("/", async(req, res) => {
 });
 
 // Handle GET requests for /applications and sends data as JSON
-router.get("/", async(req, res) => {
+router.get("/", requireRole('admin'), async(req, res) => {
     // Prepares the limit parameter from the request query
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     // Prepares the offset parameter from the request query
@@ -69,7 +71,7 @@ router.get("/", async(req, res) => {
 });
 
 // Handle GET requests for /applications/:id and sends data as JSON
-router.get("/:id", async(req, res) => {
+router.get("/:id", requireRole('user', 'admin'), async(req, res) => {
     // Extract the applications ID from the URL parameters
     const applicationId = Number(req.params.id);
     // Validate the application ID
@@ -94,7 +96,7 @@ router.get("/:id", async(req, res) => {
 });
 
 // Handles PATCH requests for /application/:id to update a job application
-router.patch("/:id", async(req, res) => {
+router.patch("/:id", requireRole('admin'), async(req, res) => {
     // Extract the application ID from the URL parameters
     const applicationId = Number(req.params.id);
     // Validate the application ID
@@ -155,7 +157,7 @@ router.patch("/:id", async(req, res) => {
 });
 
 // Handle DELETE requests for /applications/:id to delete a application
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole('admin'),  async (req, res) => {
     // Extract the application ID from the URL parameters
     const applicationId = Number(req.params.id);
     // Validate the application ID

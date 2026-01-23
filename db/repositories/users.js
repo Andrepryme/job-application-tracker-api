@@ -2,7 +2,7 @@ const { pool } = require('../database');
 
 // Function to create a new user
 async function createUser(email, password) {
-    const sql = "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email";
+    const sql = "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, user_role";
     const result = await pool.query(sql, [email, password]);
     return result.rows[0];
 }
