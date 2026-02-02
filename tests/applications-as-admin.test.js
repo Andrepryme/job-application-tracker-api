@@ -1,7 +1,7 @@
 const request = require("supertest");
 const app = require("../app");
 
-describe('Application', () => {
+describe('Tests the application as admin', () => {
     let token, applicationId;
 
     beforeAll(async () => {
@@ -38,6 +38,13 @@ describe('Application', () => {
 
     });
 
+    it('allows GET all aplications', async () => {
+        const res = await request(app)
+            .get('/applications/')
+            .set("Authorization", `Bearer ${token}`)
+        expect(res.statusCode).toBe(200);
+    });
+    
     it('allows valid status transition: applied -> interview', async () => {
         const res = await request(app)
             .patch(`/applications/${applicationId}`)
@@ -86,5 +93,12 @@ describe('Application', () => {
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'rejected' });
         expect(res.statusCode).toBe(409);
+    });
+
+    it('allows DELETE aplication by Id', async () => {
+        const res = await request(app)
+            .delete(`/applications/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+        expect(res.statusCode).toBe(204);
     });
 });
