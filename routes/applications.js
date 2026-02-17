@@ -2,11 +2,17 @@
 const express = require("express");
 const router = express.Router();
 
+const { 
+    logError,
+    logInfo
+} = require("../utils/logger");
+
 // Import database functions for job application
 const {
     createApp,
     getAllApps,
     getAppById,
+    updateApp,
     updateAppStatus,
     deleteApp
 } = require("../db/repositories/applications");
@@ -15,21 +21,18 @@ const {
     authMiddleware
  } = require("../middleware/auth");
 
-const { 
-    logError,
-    logInfo
-} = require("../utils/logger");
 
-const { requireRole } = require("../middleware/rbac");
+const { requirePermission } = require("../middleware/rbac");
 
 // Apply authentication middleware to all routes in this router
 router.use(authMiddleware);
 
 // Handles POST requests, and used to create application
-router.post("/", requireRole('user', 'admin'), async(req, res) => {
+router.post("/", requirePermission(['create_application']), async(req, res) => {
     // Extract user inputs from the request body
     const comapanyName = req.body.company_name;
     const roleTitle = req.body.role_title;
+
     // Validate user inputs
     if (!comapanyName) {
         return res.status(400).json({ error: "Comapany name is required" });
@@ -50,14 +53,14 @@ router.post("/", requireRole('user', 'admin'), async(req, res) => {
 });
 
 // Handle GET requests for /applications and sends data as JSON
-router.get("/", requireRole('admin'), async(req, res) => {
+router.get("/", requirePermission(['read_own_application', 'read_all_applications']), async(req, res) => {
     // Prepares the limit parameter from the request query
     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
     // Prepares the offset parameter from the request query
     const offset = parseInt(req.query.offset) || 0;
     // Retrieve the applications from the database
     try {
-        const allApplications = await getAllApps(req.user.userId, limit, offset);
+        const allApplications = await getAllApps(req.user.userId, limit, offset, req.matchedPermission);
         if (!allApplications) {
             return res.status(404).json({ error: "No applications found" });
         }
@@ -71,7 +74,7 @@ router.get("/", requireRole('admin'), async(req, res) => {
 });
 
 // Handle GET requests for /applications/:id and sends data as JSON
-router.get("/:id", requireRole('user', 'admin'), async(req, res) => {
+router.get("/:id", requirePermission(['read_own_application', 'read_all_applications']), async(req, res) => {
     // Extract the applications ID from the URL parameters
     const applicationId = Number(req.params.id);
     // Validate the application ID
@@ -80,7 +83,7 @@ router.get("/:id", requireRole('user', 'admin'), async(req, res) => {
     }
     // Retrieve the application from the database
     try {
-        const thisApplication = await getAppById(applicationId, req.user.userId);
+        const thisApplication = await getAppById(applicationId, req.user.userId, req.matchedPermission);
         // If application not found, send 404 response
         if (!thisApplication) {
             return res.status(404).json({ error: "Application not found" });
@@ -96,7 +99,49 @@ router.get("/:id", requireRole('user', 'admin'), async(req, res) => {
 });
 
 // Handles PATCH requests for /application/:id to update a job application
-router.patch("/:id", requireRole('admin'), async(req, res) => {
+router.patch("/:id", requirePermission(['update_own_application']), async(req, res) => {
+    // Extract the application ID from the URL parameters
+    const applicationId = Number(req.params.id);
+    // Validate the application ID
+    if (Number.isNaN(applicationId)) {
+        return res.status(400).json({ error: "Invalid application ID" });
+    }
+    // Extract fields to update from the request body
+    const { company_name, role_title } = req.body;
+
+    // Validate that at least one field to update is provided
+    if (company_name  === undefined && role_title === undefined) {
+        return res.status(400).json({
+            error: "Company name or role title must be provided"
+        });
+    }
+    // Update the application in the database
+    try {
+        const updatedApp = await updateApp(
+            applicationId,
+            { company_name, role_title },
+            req.user.userId
+        );
+        // If no rows were affected, the application was not found
+        if (updatedApp === 0) {
+            return res.status(404).json({ error: "Application not found" });
+        }
+        // Send the updated application as JSON
+        res.status(200).json({ message: "Application updated successfully", updatedApp });
+    } catch (err) {
+
+        if (err.message === 'ForbiddenOwnership') {
+            logInfo('Forbidden: insufficient permission');
+            return res.status(400).json({ error: 'Forbidden: insufficient permission' });
+        }
+        
+        logError("Failed to update application", err);
+        res.status(500).json({ error: "Failed to update application" });
+    } 
+});
+
+// Handles PATCH requests for /application/status/:id to update a job application status
+router.patch("/status/:id", requirePermission(['update_any_application']), async(req, res) => {
     // Extract the application ID from the URL parameters
     const applicationId = Number(req.params.id);
     // Validate the application ID
@@ -117,14 +162,18 @@ router.patch("/:id", requireRole('admin'), async(req, res) => {
     try {
         const updatedApp = await updateAppStatus(
             applicationId,
-            req.user.userId,
-            trimmedStatus
+            trimmedStatus,
         );
 
         // Send the updated job application as JSON
         res.status(200).json({ message: "Job application updated successfully", updatedApp });
 
     } catch (err) {
+
+        if (err.message === 'ForbiddenOwnership') {
+            logInfo('Forbidden: insufficient permission');
+            return res.status(400).json({ error: 'Forbidden: insufficient permission' });
+        }
 
         if (err.message === 'InvalidStatus') {
             logInfo('Invalid status');
@@ -157,7 +206,7 @@ router.patch("/:id", requireRole('admin'), async(req, res) => {
 });
 
 // Handle DELETE requests for /applications/:id to delete a application
-router.delete("/:id", requireRole('admin'),  async (req, res) => {
+router.delete("/:id", requirePermission(['delete_own_application', 'delete_any_application']),  async (req, res) => {
     // Extract the application ID from the URL parameters
     const applicationId = Number(req.params.id);
     // Validate the application ID
@@ -166,17 +215,26 @@ router.delete("/:id", requireRole('admin'),  async (req, res) => {
     }
     // Delete the application from the database
     try {
-        const deletedApp = await deleteApp(applicationId, req.user.userId);
+        const deletedApp = await deleteApp(applicationId, req.user.userId, req.matchedPermission);
+
         // If no rows were affected, the application was not found
         if (deletedApp === 0) {
             return res.status(404).json({ error: "Application not found" });
         }
-        // Send a 204 No Content response        
         res.status(204).send();
     } catch (err) {
-        // Console error for debugging
+
+        if (err.message === 'WorkInProgress') {
+            logInfo('Work in progress');
+            return res.status(400).json({ error: 'Work in progress' });
+        }
+
+        if (err.message === 'ForbiddenOwnership') {
+            logInfo('Forbidden: insufficient permission');
+            return res.status(400).json({ error: 'Forbidden: insufficient permission' });
+        }
+
         console.error("DELETE ERROR:", err);
-        // Return a 500 error response
         res.status(500).json({ error: "Failed to delete application" });
     }
 });

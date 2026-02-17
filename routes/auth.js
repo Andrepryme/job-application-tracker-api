@@ -23,42 +23,47 @@ router.get("/", async(req, res) => {
 
 // Route to handle user registration
 router.post("/register", async (req, res) => {
+
   // Validate request body
   if (!req.body) {
-    // Client & console log error message
     logInfo("Missing request body error");
     return res.status(400).json({ error: "Request body is missing" });
   }
+  
   // Extract email and password from the request body
   const { email, password } = req.body;
+
   // Basic validation for email and password
   if (!email || !password) {
-    // Client & console log error message
-    logInfo("Missing email or password error");
+    logInfo("Email and password are required");
     return res.status(400).json({ error: "Email and password are required" });
   }
-  // Attempt to create a new user
+
   try {
-    // Hash the password before storing it
+
+    // Hash the password
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hashSync(password, saltRounds);
-    // Call the createUser function from the database module
+
+    // Create new user
     const newUser = await createUser(email, hashedPassword);
-    // Successful response
+
+    // Registeration successful
     res.status(201).json({
       message: "User registered successfully",
       user: {
         id: newUser.id, email: newUser.email, role: newUser.user_role
       }
     });
+
   } catch (err) {
+
     // Handle unique constraint violation for email
     if (err.code === '23505') {
-      // Client & console log error message
       logInfo("Email already exist")
       return res.status(409).json({ error: "Email already exists" });
     }
-    // Client & console log error message
+
     logError("Error registering user", err);
     res.status(500).json({ error: "Failed to register user" });
   }
@@ -66,32 +71,31 @@ router.post("/register", async (req, res) => {
 
 // Route to handle user login
 router.post('/login', async (req, res) => {
+
   // Validate request body
   if (!req.body) {
-    // Client & console log error message
     logInfo("Missing request body error");
     return res.status(400).json({ error: "Request body is missing" });
   }
-  // Extract email and password from the request body
   const { email, password } = req.body;
+
   // Basic validation for email and password
   if (!email || !password) {
-    // Client & console log error message
     logInfo("Missing email or password error");
     return res.status(400).json({ error: "Email and password are required" });
   }
+
   try {
     // Retrieve user by email
     const thisUser = await getUserByEmail(email);
     if (!thisUser) {
-      // Client & console log error message
       logInfo("User not found error");
       return res.status(401).json({ error: "Invalid email or password" });
     }
+
     // Compare provided password with stored password hash
     const passwordMatch = await bcrypt.compare(password, thisUser.password_hash);
     if (!passwordMatch) {
-      // Client & console log error message
       logInfo("Invalid email or password");
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -99,16 +103,17 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { userId: thisUser.id, email: thisUser.email, role: thisUser.user_role },
       JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "24h" }
     );
+
     // Successful login response
     res.json({ 
       message: "Login successful",
-      user: { id: thisUser.id, email: thisUser.email, role: thisUser.user_role },
+      user: { id: thisUser.id, email: thisUser.email },
       token
     });
+
   } catch (err) {
-    // Client & console log error message
     logError("Error logging in user:", err);
     res.status(500).json({ error: "Authentication failed" });
   }

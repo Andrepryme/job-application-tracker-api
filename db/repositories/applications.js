@@ -29,56 +29,115 @@ async function createApp(comapanyName, roleTitle, user_id) {
 }
 
 // Function to get a job application by ID
-async function getAppById(id, user_id) {
-    const sql = "SELECT * FROM job_applications WHERE id = $1 AND user_id = $2";
-    const result = await pool.query(sql, [id, user_id]);
+async function getAppById(id, user_id, permission) {
+    let sql, result;
+    if (permission === "read_own_application") {
+        sql = ` SELECT * FROM job_applications WHERE id = $1 AND user_id = $2 `;
+        result = await pool.query(sql, [id, user_id]);
+    } else if (permission === "read_all_applications") {
+        sql =` SELECT * FROM job_applications WHERE id = $1 `;
+        result = await pool.query(sql, [id]);
+    } else {
+        throw new Error("ForbiddenOwnership");
+    }
     return result.rows[0] || null;
 }
 
 // Function to get all job applications
-async function getAllApps(user_id, limit, offset) {
-    const sql =`
-        SELECT *
-        FROM job_applications
-        WHERE user_id = $1
-        ORDER by created_at DESC
-        LIMIT $2 OFFSET $3
-    `;
-    const result = await pool.query(sql, [user_id, limit, offset]);
+async function getAllApps(user_id, limit, offset, permission) {
+    let sql, result;
+    if (permission === "read_own_application") {
+        sql = `
+            SELECT *
+            FROM job_applications
+            WHERE user_id = $1
+            ORDER by created_at DESC
+            LIMIT $2 OFFSET $3
+        `;
+        result = await pool.query(sql, [user_id, limit, offset]);
+    } else if (permission === "read_all_applications") {
+        sql =`
+            SELECT *
+            FROM job_applications
+            ORDER by created_at DESC
+            LIMIT $1 OFFSET $2
+        `;
+        result = await pool.query(sql, [limit, offset]);
+    } else {
+        throw new Error("ForbiddenOwnership");
+    }
     return result.rows || null;
 }
 
 // Function to update a job application
-async function updateAppStatus(applicationId, userId, newStatus) {
-    const client = await pool.connect();
-    
-    // Checks the allStatus array to if request status matches one of business approved status
-    const approvedNewStatus = allStatus.find(aStatus => aStatus.name === newStatus)?.name;
+async function updateApp(id, fields, user_id) {
+    // Build the SQL query dynamically based on provided fields
+    const updates = [];
+    // Parameters array for the SQL query
+    const values = [];
+    // paramIndex tracks placeholder
+    let paramIndex = 1;
 
-    // Return 404 status code if request status does not match any of business approved status
-    if (!approvedNewStatus) {
+    // Only update the company_name if it's provided
+    if (fields.company_name !== undefined) {
+        updates.push(`company_name = $${paramIndex}`);
+        values.push(fields.company_name);
+        paramIndex++;
+    }
+    // Only update the role_title if it's provided
+    if (fields.role_title !== undefined) {
+        updates.push(`role_title = $${paramIndex}`);
+        values.push(fields.role_title);
+        paramIndex++;
+    }
+
+    // If there are fields to update, update the updated_at else return early
+    if (updates.length !== 0) {
+        const currentTimeStamp = new Date();
+        updates.push(`updated_at  = $${paramIndex}`);
+        values.push(currentTimeStamp);
+    } else {
+        return null;
+    }
+
+    const sql = `
+        UPDATE job_applications
+        SET ${updates.join(', ')}
+        WHERE id = $${paramIndex + 1}
+        AND user_id = $${paramIndex + 2}
+        RETURNING *;
+    `;
+    // Add the applications ID and user ID to the parameters array
+    values.push(id, user_id);
+    const result = await pool.query(sql, values);
+    return result.rows[0] || null;
+}  
+
+// Function to update a job application status
+async function updateAppStatus(applicationId, newStatus) {
+    // Checks the allStatus array to if request status matches one of business approved status
+    const businessStatus = allStatus.find(aStatus => aStatus.name === newStatus)?.name;
+
+    //  Check for valid status
+    if (!businessStatus) {
         throw new Error('InvalidStatus');
     }
+
     // Begin update transaction
-    try {
+    const client = await pool.connect();
+    try { 
         await client.query('BEGIN');
 
-        // 1. Get current status (ownership enforced)
-        const currentStatus = await client.query(
-            `
-                SELECT current_status
-                FROM job_applications
-                WHERE id = $1 AND user_id = $2
-                FOR UPDATE
-            `,
-            [applicationId, userId]
-        );
+        // 1. Get current status and lock row
+        const adminSql = ` SELECT * FROM job_applications WHERE id = $1 FOR UPDATE `;
+        const adminResult = await client.query(adminSql, [applicationId]);
+
         // Ensure the job application exists before proceeding
-        if (currentStatus.rowCount === 0) {
+        if (adminResult.rowCount === 0) {
             throw new Error('ApplicationNotFound');
         }
 
-        const oldStatus = currentStatus.rows[0].current_status;
+        const oldStatus = adminResult.rows[0].current_status;
 
         // Check that the new status and the old status are not the same
         if (newStatus === oldStatus) {
@@ -87,18 +146,18 @@ async function updateAppStatus(applicationId, userId, newStatus) {
 
         // Transition validation
         const allowedTransitions = statusTransitions[oldStatus] || [];
-        if (!allowedTransitions.includes(approvedNewStatus)) {
-         throw new Error('InvalidTransition');
+        if (!allowedTransitions.includes(businessStatus)) {
+        throw new Error('InvalidTransition');
         }
 
         // 2. Update current status
-         const updatedResult = await client.query(
+        const updatedResult = await client.query(
             `
             UPDATE job_applications
             SET current_status = $1, updated_at = NOW()
-            WHERE id = $2 AND user_id = $3
+            WHERE id = $2
             `,
-            [approvedNewStatus, applicationId, userId]
+            [businessStatus, applicationId]
         );
 
         // Ensure update was successful before inserting history
@@ -113,10 +172,10 @@ async function updateAppStatus(applicationId, userId, newStatus) {
             (application_id, old_status, new_status)
             VALUES ($1, $2, $3)
             `,
-            [applicationId, oldStatus, approvedNewStatus]
+            [applicationId, oldStatus, businessStatus]
         );
         await client.query('COMMIT');
-        return { applicationId, oldStatus, approvedNewStatus };
+        return { applicationId, oldStatus, businessStatus };
 
     } catch (err) {
         await client.query('ROLLBACK');
@@ -127,9 +186,19 @@ async function updateAppStatus(applicationId, userId, newStatus) {
 }
 
 // Function to delete a job application by ID
-async function deleteApp(id, user_id) {
-    const sql = "DELETE FROM job_applications WHERE id = $1 AND user_id = $2";
-    const result = await pool.query(sql, [id, user_id]);
+async function deleteApp(id, user_id, permission) {
+
+    let sql, result;
+    if (permission === "delete_own_application") {
+        sql = ` DELETE FROM job_applications WHERE id = $1 AND user_id = $2 `;
+        result = await pool.query(sql, [id, user_id]);
+    } else if (permission === "delete_any_application") {
+        // sql =` DELETE FROM job_applications WHERE id = $1 AND user_id = $2 `;
+        // result = await pool.query(sql, [id]);
+        throw new Error("WorkInProgress");
+    } else {
+        throw new Error("ForbiddenOwnership");
+    }
     return result.rowCount; 
 }   
 
@@ -137,6 +206,7 @@ module.exports = {
     createApp,
     getAllApps,
     getAppById,
+    updateApp,
     updateAppStatus,
     deleteApp
 }

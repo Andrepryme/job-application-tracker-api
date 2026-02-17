@@ -33,35 +33,43 @@ describe('Tests the application as user', () => {
         expect(appCreate.statusCode).toBe(201);
     });
 
-    it('allows GET an application by ID', async () => {
+    it('allows GET owned application by ID', async () => {
         const appGet = await request(app)
             .get(`/applications/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
         expect(appGet.statusCode).toBe(200);
     }); 
 
-    it('blocks GET all aplications', async () => {
+    it('allows GET all owned aplications', async () => {
         const appGetAll = await request(app)
             .get('/applications')
             .set("Authorization", `Bearer ${token}`)
-        expect(appGetAll.statusCode).toBe(403);
+        expect(appGetAll.statusCode).toBe(200);
     }); 
 
-    it('blocks UPDATE to application', async () => {
+    it('allows UPDATE to own application', async () => {
         const res = await request(app)
             .patch(`/applications/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
-            .send({ current_status: 'interview' });
+            .send({ company_name: 'Marine Technologies 2' });
+
+        expect(res.statusCode).toBe(200);
+    });
+
+    it('blocks status UPDATE on application', async () => {
+        const res = await request(app)
+            .patch(`/applications/status/${applicationId}`)
+            .set("Authorization", `Bearer ${token}`)
+            .send({ current_status: 'offer' });
 
         expect(res.statusCode).toBe(403);
     });
 
-    it('blocks DELETE an application', async () => {
+    it('allows DELETE on own application', async () => {
         const res = await request(app)
             .delete(`/applications/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
-            .send({ current_status: 'interview' });
 
-        expect(res.statusCode).toBe(403);
+        expect(res.statusCode).toBe(204);
     });
 });

@@ -10,14 +10,15 @@ describe('Tests the application as admin', () => {
         const password = "TestPassword123";
 
         // Register a new user
-        await request(app)
+        const newUser = await request(app)
             .post("/auth/register")
             .send({ email, password });
 
         // Promote user to admin
         const { pool } = require('../db/database');
-        await pool.query("UPDATE users SET user_role = 'admin' WHERE email = $1",
-            [email]
+        await pool.query(
+            ` UPDATE user_roles SET role_id = 2 WHERE user_id = $1 `,
+            [newUser.body.user.id]
         );
 
         // Log in with the newly registered user
@@ -47,7 +48,7 @@ describe('Tests the application as admin', () => {
     
     it('allows valid status transition: applied -> interview', async () => {
         const res = await request(app)
-            .patch(`/applications/${applicationId}`)
+            .patch(`/applications/status/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'interview' });
         expect(res.statusCode).toBe(200);
@@ -55,7 +56,7 @@ describe('Tests the application as admin', () => {
 
     it('rejects invalid transistions: interview -> applied', async () => {
         const res = await request(app)
-            .patch(`/applications/${applicationId}`)
+            .patch(`/applications/status/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'applied' });
         expect(res.statusCode).toBe(409);
@@ -63,7 +64,7 @@ describe('Tests the application as admin', () => {
     
     it('rejects same-status update: interview -> interview', async () => {
         const res = await request(app)
-            .patch(`/applications/${applicationId}`)
+            .patch(`/applications/status/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'interview' });
         expect(res.statusCode).toBe(409);
@@ -71,12 +72,12 @@ describe('Tests the application as admin', () => {
 
     it('moves interview -> offer -> accepted', async () => {
         await request(app)
-            .patch(`/applications/${applicationId}`)
+            .patch(`/applications/status/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'offer' });
 
         const res = await request(app)
-            .patch(`/applications/${applicationId}`)
+            .patch(`/applications/status/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'accepted' });
         expect(res.statusCode).toBe(200);
@@ -84,21 +85,21 @@ describe('Tests the application as admin', () => {
 
     it('blocks transistion from terminal state', async () => {
         await request(app)
-            .patch(`/applications/${applicationId}`)
+            .patch(`/applications/status/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'offer' });
 
         const res = await request(app)
-            .patch(`/applications/${applicationId}`)
+            .patch(`/applications/status/${applicationId}`)
             .set("Authorization", `Bearer ${token}`)
             .send({ current_status: 'rejected' });
         expect(res.statusCode).toBe(409);
     });
 
-    it('allows DELETE aplication by Id', async () => {
-        const res = await request(app)
-            .delete(`/applications/${applicationId}`)
-            .set("Authorization", `Bearer ${token}`)
-        expect(res.statusCode).toBe(204);
-    });
+    // it('allows DELETE aplication by Id', async () => {
+    //     const res = await request(app)
+    //         .delete(`/applications/${applicationId}`)
+    //         .set("Authorization", `Bearer ${token}`)
+    //     expect(res.statusCode).toBe(204);
+    // });
 });

@@ -1,24 +1,27 @@
-const { logInfo } = require("../utils/logger");
+const { userHasPermission } = require("../db/rbac");
 
-// Middleware function to authenticate requests using JWT tokens
-function requireRole (...allowedRoles) {
-    return (req, res, next) => {
-        if (!req.user || !req.user.role) {
-            logInfo("Access denied");
-            return res.status(403).json({ 
-                error: 'Access denied'
-            });
+function requirePermission(permissionNames) {
+  return async function (req, res, next) {
+    try {
+      const userId = req.user.userId;
+      
+      for (const thisPermission of permissionNames) {
+        const allowed = await userHasPermission(userId, thisPermission);
+        
+        if (allowed) {
+          req.matchedPermission = thisPermission;
+          return next();
         }
+      }
 
-        if (!allowedRoles.includes(req.user.role)) {
-            logInfo("Insufficient permission");
-            return res.status(403).json({ 
-                error: 'Insufficient permission'
-            });
-        }
+      console.error("Forbidden");
+      return res.status(403).json({ error: "Forbidden: insufficient permission" });
 
-        next();
-    };
+    } catch (err) {
+      console.error("RBAC ERROR:", err);
+      res.status(500).json({ error: "Authorization check failed" });
+    }
+  };
 }
 
-module.exports = { requireRole };
+module.exports = { requirePermission };
